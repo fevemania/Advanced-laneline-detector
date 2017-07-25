@@ -170,7 +170,7 @@ e.g.
 
 ![course piture](examples/warped_straight_lines.jpg)
 
-**However, with this way, we can never generalize method on to real world. **
+**However, with this way, we can never generalize method on to real world.**
 
 We need more rebust method which cover most of views recevied from car camera. 
 
@@ -330,7 +330,7 @@ Here I think two keys to handle this problem as following:
 
 It's really difficult to pick the good range of threshing to apply in any situdation with different light and shadow. What I do is just take as many as source that is robust to light and shadows and pick the union of them to get as many as pixels from lane in case of detecting nothing.
 
-* **Decide the range of src vertices in Perspective Tranformation Step **
+* **Decide the range of src vertices in Perspective Tranformation Step**
 
 Thx to [navoshta's repo](https://github.com/navoshta/detecting-road-features), it really gives me the way to tackle this problem. Instead of trying to pick exactly to edge to the lane from the given image, what we should do is to get the src vertices that will cover most of the lane in image in reality world.
 
@@ -338,14 +338,14 @@ Thx to [navoshta's repo](https://github.com/navoshta/detecting-road-features), i
 
 # Important Note.
 
-**This repo refer to [navoshta's repo](https://github.com/navoshta/detecting-road-features) with following content: **
+**This repo refer to [navoshta's repo](https://github.com/navoshta/detecting-road-features) with following content:**
 
 * my README.md style
 * my comment style in each module
-* the modulization method (learning from **[camera.py][https://github.com/navoshta/detecting-road-features/blob/master/source/lanetracker/camera.py]**)
+* the modulization method (learning from **[camera.py](https://github.com/navoshta/detecting-road-features/blob/master/source/lanetracker/camera.py)**)
 
 
-* the naming of flatten_perspective in **[perspective.py][https://github.com/navoshta/detecting-road-features/blob/master/source/lanetracker/perspective.py]**
+* the naming of flatten_perspective in **[perspective.py](https://github.com/navoshta/detecting-road-features/blob/master/source/lanetracker/perspective.py)**
 * the way to decide dst and src vertices in **perspective.py**
 
 Cause I'm almost the Newbie how to modulize, how to make a good comment, and how to write a good README.md. I feel appreciate with [navoshta's repo](https://github.com/navoshta/detecting-road-features).
