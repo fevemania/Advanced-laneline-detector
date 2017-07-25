@@ -6,12 +6,25 @@
 | `source/lanetracker/gredient_thresh.py`  | Calculate gradient to detect the pixels belong to lane. |
 |   `source/lanetracker/color_thresh.py`   | Apply threshold to image with either HLS colorspace or RGB colorspace to find white and yello lane pixels. |
 |   `source/lanetracker/perspective.py`    | Mapping the image from the vehicle front-facing camera to a bird view |
-|   `source/lanetracker/lane_finder.py`    | Use peaks in a histogram of the bottom half of the image to decide explicitly which pixels are part of the lines. |
+|       `source/lanetracker/line.py`       | Use peaks in a histogram of the bottom half of the image to decide explicitly which pixels are part of the lines. |
 |                                          |                                          |
 
 
 
 # Lane Tracker
+
+The goals / steps of this project are the following:
+
+- Compute the camera calibration matrix and distortion coefficients given a set of chessboard images.
+- Apply a distortion correction to raw images.
+- Use color transforms, gradients, etc., to create a thresholded binary image.
+- Apply a perspective transform to rectify binary image ("birds-eye view").
+- Detect lane pixels and fit to find the lane boundary.
+- Determine the curvature of the lane and vehicle position with respect to center.
+- Warp the detected lane boundaries back onto the original image.
+- Output visual display of the lane boundaries and numerical estimation of lane curvature and vehicle position.
+
+
 
 The software pipeline to identify the lane boundaries in the given video which includes the following steps applying to each frame:
 
@@ -19,6 +32,7 @@ The software pipeline to identify the lane boundaries in the given video which i
 * **Gredient and Color Threshing.**
 * **Perspective Transformation.**
 * **Find Boundary Lane.**
+* **Measure Curvature of Radius and Vehicle Position**
 
 
 
@@ -206,32 +220,116 @@ This resulted in the following source and destination points:
 
 ## Find Boundary Lane
 
+There are serveral ways to find boundary lane, here I choose the method that use peaks in a histogram of the bottom half of the image as the base line for searching to decide explicitly which pixels are part of the lines. We seperate the whole height of the image into 9 window height, each searching window has its own geometric center calculated from pixels value in that window. After collecting the pixels of left lane and right lane (**Red **for **left**, **Blue** for **right**) from each window, we calculate the coefficient of quadratic function accordingly and draw the lane at the same time. Then we could do inverse perspective transformation to original front-camera view.  
+
+**Note. Because we have more than one pixel at the same **
 
 
 
+e.g.
 
-Creating a great writeup:
+![lane_line_and_windows](output_images/lane_line_and_windows.png)
+
+However, because after calculating the coefficient of quadratic function about left lane and right lane. We could simplify operations on searching. In the successor frames, we evaluate the (x,y) positions of pixels along the left and right lane and fit a polynomial and keep update the coefficient of quadratic function with new detected pixels.
+
+> for implementation details check functions in `lanetracker/line.py`.
+
+
+
+## Measure Curvature of Radius and Vehicle Position 
+
+### Curvature of Radius
+
+Because there are lots of pixels at the same x position of left lane boundary and right lane boundary, it would be better for us to evaluate (x, y) points of lane boundary along y axis. $f(y) = a \, y^{2} + b \, y + c = 0$ 
+
+The radius of curvature ([awesome tutorial here](http://www.intmath.com/applications-differentiation/8-radius-curvature.php)) at any point x of the function x=f(y) is given as follows:
+$$
+Rcurve = \frac{[1+(\frac{dx}{dy})^2]^{3/2}}{|\frac{dy^{2}}{d^{2}x}|}
+$$
+In the case of the second order polynomial above, the first and second derivatives are:  
+
+$f′(y)=\frac{dy}{dx}=2Ay+B $
+
+$f′′(y)=\frac{dy^{2}}{d^{2}x}=2A $
+
+So, our equation for radius of curvature becomes: 
+
+$Rcurve = \frac{[1+(2Ay+B)^2]^{3/2}}{|2A|}$
+
+In my Python code, I use the `y` value at the bottom of the image. It is the closet position to our car.
+
+```python
+ploty = np.linspace(0, 719, 720)
+y_eval = np.max(ploty)
+```
+
+Also because we need to calculate distance to camera in real world coordinate system (e.g. meters), we assume that there are 3.7 meters for 700 pixels for x axis, and 30 meters for 720 pixels for y axis.
+
+```python
+ym_per_pix = 30/720   # meters per pixel in y dimension
+xm_per_pix = 3.7/700  # meters per pixel in x dimension
+```
+
+Now we can calculate curvature of radius according to our formulas,
+
+```python
+# leftx : the collection of x values of pixels belongs to left lane boundary
+# rightx : the collection of x values of pixels belongs to right lane boundary
+
+# Fit new polynomials to x, y in world space
+left_fit_cr = np.polyfit(ploty*ym_per_pix, leftx*xm_per_pix, 2)
+right_fit_cr = np.polyfit(ploty*ym_per_pix, rightx*xm_per_pix, 2)
+
+left_curverad = ((1 + (2*left_fit_cr[0]*y_eval*ym_per_pix + left_fit_cr[1])**2)**1.5) \
+				/ np.absolute(2*left_fit_cr[0])
+right_curverad = ((1 + (2*left_fit_cr[0]*y_eval*ym_per_pix + right_fit_cr[1])**2)**1.5) \
+                     / np.absolute(2*left_fit_cr[0])
+    
+# take the average value of left_curverad and right_curverad
+return int(np.average([left_curverad, right_curverad]))
+```
+
+### Vehicle Position
+
+We calculates the deviation of the midpoint of the lane `x_eval` from the center of the image `car position`
+
+Again, we evaluate our x position of car to be at the bottom of image. Take the average value of x position at left lane and x position at right lane.
+
+Also we assume that there are 3.7 meters for 700 pixels for x axis.
+
+```python
+y_eval = int(np.max(ploty))
+x_eval = int(np.average([leftx[y_eval], rightx[y_eval]]))
+
+xm_per_pix = 3.7 / 700
+
+# Here, w // 2 is car position
+# 		x_eval is middle position of lane
+# if distance > 0, then it means car is at the right of center.
+# if distance < 0, then it means car is at the left of center
+distance = round((w // 2 - x_eval) * xm_per_pix, 3)
+```
+
+Here is the final result of our example,
+
+![Final Result](output_images/final_result.png)
+
+## Pipeline (video)
+
+![](test_videos_output/challenge.gif)
+
+
+
+### Discussion
+
+#### 1. Briefly discuss any problems / issues you faced in your implementation of this project.  Where will your pipeline likely fail?  What could you do to make it more robust?
+
+Here I'll talk about the approach I took, what techniques I used, what worked and why, where the pipeline might fail and how I might improve it if I were going to pursue this project further.  
+
+
+
+About this Project
 ---
-
-A great writeup should include the rubric points as well as your description of how you addressed each point.  You should include a detailed description of the code used in each step (with line-number references and code snippets where necessary), and links to other supporting documents or external references.  You should include images in your writeup to demonstrate how your code works with examples.  
-
-All that said, please be concise!  We're not looking for you to write a book here, just a brief description of how you passed each rubric point, and references to the relevant code :). 
-
-You're not required to use markdown for your writeup.  If you use another method please just submit a pdf of your writeup.
-
-The Project
----
-
-The goals / steps of this project are the following:
-
-* Compute the camera calibration matrix and distortion coefficients given a set of chessboard images.
-* Apply a distortion correction to raw images.
-* Use color transforms, gradients, etc., to create a thresholded binary image.
-* Apply a perspective transform to rectify binary image ("birds-eye view").
-* Detect lane pixels and fit to find the lane boundary.
-* Determine the curvature of the lane and vehicle position with respect to center.
-* Warp the detected lane boundaries back onto the original image.
-* Output visual display of the lane boundaries and numerical estimation of lane curvature and vehicle position.
 
 The images for camera calibration are stored in the folder called `camera_cal`.  The images in `test_images` are for testing your pipeline on single frames.  If you want to extract more test images from the videos, you can simply use an image writing method like `cv2.imwrite()`, i.e., you can read the video in frame by frame as usual, and for frames you want to save for later you can write to an image file.  
 
