@@ -7,7 +7,7 @@
 |   `source/lanetracker/color_thresh.py`   | Apply threshold to image with either HLS colorspace or RGB colorspace to find white and yello lane pixels. |
 |   `source/lanetracker/perspective.py`    | Mapping the image from the vehicle front-facing camera to a bird view |
 |       `source/lanetracker/line.py`       | Use peaks in a histogram of the bottom half of the image to decide explicitly which pixels are part of the lines. |
-|                                          |                                          |
+|          `source/example.ipynb`          | the main pipeline to execute each module |
 
 
 
@@ -236,21 +236,21 @@ However, because after calculating the coefficient of quadratic function about l
 
 ### Curvature of Radius
 
-Because there are lots of pixels at the same x position of left lane boundary and right lane boundary, it would be better for us to evaluate (x, y) points of lane boundary along y axis. $f(y) = a \, y^{2} + b \, y + c = 0$ 
+Because there are lots of pixels at the same x position of left lane boundary and right lane boundary, it would be better for us to evaluate (x, y) points of lane boundary along y axis. 
+
+![quadratic_function](output_images/quadratic_function.png)
 
 The radius of curvature ([awesome tutorial here](http://www.intmath.com/applications-differentiation/8-radius-curvature.php)) at any point x of the function x=f(y) is given as follows:
-$$
-Rcurve = \frac{[1+(\frac{dx}{dy})^2]^{3/2}}{|\frac{dy^{2}}{d^{2}x}|}
-$$
+
+![Rcurve_formula](output_images/Rcurve_formula.png)
+
 In the case of the second order polynomial above, the first and second derivatives are:  
 
-$f′(y)=\frac{dy}{dx}=2Ay+B $
-
-$f′′(y)=\frac{dy^{2}}{d^{2}x}=2A $
+![derivation_formula](output_images/derivation_formula.png)
 
 So, our equation for radius of curvature becomes: 
 
-$Rcurve = \frac{[1+(2Ay+B)^2]^{3/2}}{|2A|}$
+![Rcurve_reduction](output_images/Rcurve_reduction.png)
 
 In my Python code, I use the `y` value at the bottom of the image. It is the closet position to our car.
 
@@ -310,6 +310,8 @@ Here is the final result of our example,
 
 ![Final Result](output_images/final_result.png)
 
+> for implementation details check functions in `lanetracker/line.py`.
+
 ## Pipeline (video)
 
 ![](test_videos_output/project_video.gif)
@@ -320,9 +322,33 @@ Here is the final result of our example,
 
 #### 1. Briefly discuss any problems / issues you faced in your implementation of this project.  Where will your pipeline likely fail?  What could you do to make it more robust?
 
-Here I'll talk about the approach I took, what techniques I used, what worked and why, where the pipeline might fail and how I might improve it if I were going to pursue this project further.  
+As we mention before, I think the biggest problem of this repo is its ability to apply in reality data records by ourself without chaning too much.
+
+Here I think two keys to handle this problem as following:
+
+* **the selection of threshing combination from both color and gredient**
+
+It's really difficult to pick the good range of threshing to apply in any situdation with different light and shadow. What I do is just take as many as source that is robust to light and shadows and pick the union of them to get as many as pixels from lane in case of detecting nothing.
+
+* **Decide the range of src vertices in Perspective Tranformation Step **
+
+Thx to [navoshta's repo](https://github.com/navoshta/detecting-road-features), it really gives me the way to tackle this problem. Instead of trying to pick exactly to edge to the lane from the given image, what we should do is to get the src vertices that will cover most of the lane in image in reality world.
 
 
+
+# Important Note.
+
+**This repo refer to [navoshta's repo](https://github.com/navoshta/detecting-road-features) with following content: **
+
+* my README.md style
+* my comment style in each module
+* the modulization method (learning from **[camera.py][https://github.com/navoshta/detecting-road-features/blob/master/source/lanetracker/camera.py]**)
+
+
+* the naming of flatten_perspective in **[perspective.py][https://github.com/navoshta/detecting-road-features/blob/master/source/lanetracker/perspective.py]**
+* the way to decide dst and src vertices in **perspective.py**
+
+Cause I'm almost the Newbie how to modulize, how to make a good comment, and how to write a good README.md. I feel appreciate with [navoshta's repo](https://github.com/navoshta/detecting-road-features).
 
 About this Project
 ---
