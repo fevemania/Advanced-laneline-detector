@@ -47,12 +47,8 @@ Whenever we take photos with camera, there would be distortion introduced by len
 
 To calculate the parameters, we need the set of calibration patterns which have known geometry and easily detectable feature points. And OpenCV has built-in support for a chessboard as a calibration pattern. Here we use the given chessboard images in the folder `data/camera_cal` as calibration patterns.
 
-e.g. calibration1.jpg
 
-![calibration1](./data/camera_cal/calibration1.jpg)
-
-
-First, we need to prepare object points and also initialize two lists to store objppoints and imgpoints. Pattern size (x, y) should pass only points where two black and two white squares intersects. In the picture above there are 9 each row along x-axis, 6 each column along y-axis, that is to say, pattern_size = (9, 6).
+First, we need to prepare object points and also initialize two lists to store objppoints and imgpoints. Pattern size (x, y) should pass only points where two black and two white squares intersects. In the given picture, there are 9 points each row along x-axis, 6 points each column along y-axis, that is to say, pattern_size = (9, 6).
 
 ```python
     --------- x-axis ---------->
@@ -87,9 +83,9 @@ Once we collected numbers of images (usually 10 is enough). We could calculate *
 _, self.camera_matrix, self.distortion_coef, _, _ = cv2.calibrateCamera(objpoints, imgpoints, img_size, None, None)
 ```
 
-e.g. calibration1.jpg after Camera Calibration (including in `output_images/undistort_images`)
+e.g. calibration1.jpg after Camera Calibration (including in folder `output_images/undistort_images`)
 
-![undistorted_calibration1](output_images/undistort_images/calibration1.jpg)
+![undistort](output_images/undistort.png)
 
 > For implementation details check `CameraCalibration` class in `lanetracker/camera_calibrate.py`
 
@@ -316,7 +312,7 @@ Here is the final result of our example,
 
 ## Pipeline (video)
 
-![](test_videos_output/challenge.gif)
+![](test_videos_output/project_video.gif)
 
 
 
