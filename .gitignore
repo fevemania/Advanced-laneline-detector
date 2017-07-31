@@ -8,3 +8,5 @@ harder_challenge_video*
 *.jpeg
 assets/
 intro_classifier/
+vehicles/
+non-vehicles/
