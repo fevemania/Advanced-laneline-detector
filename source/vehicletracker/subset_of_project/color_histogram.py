@@ -2,8 +2,8 @@ import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 import numpy as np
 # Read in the image
-image = mpimg.imread('assets/cutout1.jpg')
-
+image = mpimg.imread('same_car_view_2.png')
+image = (image*255).astype('uint8')
 # Define a function to compute color histogram features  
 def color_hist(img, nbins=32, bins_range=(0, 256)):
     # Compute the histogram of the RGB channels separately
@@ -27,16 +27,18 @@ rh, gh, bh, bincen, feature_vec = color_hist(image, nbins=32, bins_range=(0, 256
 
 # Plot a figure with all three bar charts
 if rh is not None:
-    fig = plt.figure(figsize=(12,3))
-    plt.subplot(131)
+    fig = plt.figure(figsize=(12,4))
+    plt.subplot(141)
+    plt.imshow(image)
+    plt.subplot(142)
     plt.bar(bincen, rh[0])
     plt.xlim(0, 256)
     plt.title('R Histogram')
-    plt.subplot(132)
+    plt.subplot(143)
     plt.bar(bincen, gh[0])
     plt.xlim(0, 256)
     plt.title('G Histogram')
-    plt.subplot(133)
+    plt.subplot(144)
     plt.bar(bincen, bh[0])
     plt.xlim(0, 256)
     plt.title('B Histogram')

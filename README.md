@@ -7,7 +7,9 @@
 |   `source/lanetracker/color_thresh.py`   | Apply threshold to image with either HLS colorspace or RGB colorspace to find white and yello lane pixels. |
 |   `source/lanetracker/perspective.py`    | Mapping the image from the vehicle front-facing camera to a bird view |
 |       `source/lanetracker/line.py`       | Use peaks in a histogram of the bottom half of the image to decide explicitly which pixels are part of the lines. |
-|          `source/example.ipynb`          | the main pipeline to execute each module |
+| `source/vehicletracker/subset_of_project` | contrain the practice code teached from vehicle detecting lessons. |
+|          `source/example.ipynb`          | the main pipeline to execute each module (including all function used in vehicle tracking) |
+
 
 
 
@@ -168,7 +170,7 @@ Originally, I use the src vertices which exactly form the trapezoid, like what t
 
 e.g.
 
-![course piture](examples/warped_straight_lines.jpg)
+![course piture](source/warped_straight_lines.jpg)
 
 **However, with this way, we can never generalize method on to real world.**
 
@@ -312,15 +314,145 @@ Here is the final result of our example,
 
 > for implementation details check functions in `lanetracker/line.py`.
 
+
+
+# Vehicle Tracking
+
+The software pipeline to detect the cars around in the given video which includes the following steps applying to each frame:
+
+- **Extract the feature of training data.** 
+- **Train cars/notcars data with LinearSVM**
+- **Apply Sliding Window Search with the trained SVM classifier to detect the cars.**
+
+
+
+## Extract the feature of training data
+
+Roughly the information we need are **color** and **shape** of cars. We collected our feature vector from three sources. 
+
+* Spatial Bining of the image with selected colorspace.  (**color and shape** information)
+* Color Histogram of the image with selected colorspace.  (**color** information)
+* HOG of the image with the selected colorspace. (**shape** information)
+
+```python
+Num of spatial_features in one 64x64 sampling image : 3072 (32*32*3)
+Num of hist_features in one 64x64 sampling image    :   48 (16*3)
+Num of hog_features in one 64x64 sampling image     : 5880
+Num of Total features in one 64x64 sampling image   : 9000
+```
+
+**IMPORTANT: Through try and error,  we could found that the cars to be detected usually have better performance with YCrCb colorspace or YUV colorspace.**
+
+### Spatial Bining
+
+Spatial bining is a data pre-processing tech used to reduce the numbers of features of raw image without lossing the information of region of interest. Here I resize each sampling **64x64** image to **32x32**. By Testing, I found that resize to **16x16** would make the classfiier worse then **32x32**.
+
+![Spatial image 1](output_images/vehicle_track/spatial_1.png)
+
+![Spatial image 2](output_images/vehicle_track/spatial_2.png)
+
+> vehicletracker/subset_of_project/color_spatial_binning.
+
+### Color Histogram
+
+For color information, It's a good idea to calculate the distribution of color histogram instead of just directly feeding raw image in. Cause it could make our classifier more robust to solve the variation of colors effected by view from different angle toward the same car. The following example image extracted from [ferrari home page](http://812superfast.ferrari.com/en/powertrain). (For demo, I use **RGB** instead of **YCrCb** used in project). In the project I split color histogram into **16** bins. By Testing, I found that there is no difference on the performance of detecting car between **32** and **16** bins. To reduce the numbers of feature, I choose **16**.
+
+![same_car_view_1](output_images/vehicle_track/same_car_view_1.png)
+
+![same_car_view_2](output_images/vehicle_track/same_car_view_2.png)
+
+> for implementation details check functions in `vehicletracker/subset_of_project/color_histogram.py`.
+
+### Histogram of Oriented Gradients (HOG)
+
+The image below extracted from course of Udacity Self-driving Nanodegree. It shows that it is the gredient attribute that may be more rebust than color in classifying cars. However, even the gredient directly extracted from raw image will fail to detect cars due to the variation in view from different angle which dramatically change the shape of car.
+
+![shape_with_gredient](output_images/vehicle_track/shape_with_gredient.png)
+
+The essential thought behind the HOG descriptor is that local object appearance and shape within an image can be described well by the distribution of intensity gradients or orientations. (For more detail, see [wiki of HOG](https://en.wikipedia.org/wiki/Histogram_of_oriented_gradients)). It's normally to set orient number between 6 and 12. For this project, it is **10** makes perfect. I set one cell size equals to 8x8 pixels. Each pixel in one cell would get a vote on which histogram bin it belongs in based on the gradient direction at the position. And the weight of that vote depends on the gradient magnitude at that pixel. Furthermore, I set block size equals to 2x2 cells. We do the same operation on each block as on each cell instead that we also do block normalization which results in better invariance to changes in illumination and shadowing of the image.
+
+If we set pix_per_cell too low (e.g. value 4, which is half of my setting), the time comsuption on computation would take 4 times of my setting. On the other hand, if we set pix_per_cell too high (e.g. value 16), the local range may too large to perfectly represent local object (features). Same as cell_per_block.
+
+```python
+block_norm  = 'L1-sqrt'  # block normalization function of HOG
+color_space = 'YCrCb'    # It would be better to choose YUV or YCrCb
+orient = 10  		     # HOG orientations
+pix_per_cell = 8         # HOG pixels per cell
+cell_per_block = 2       # HOG cells per block
+hog_channel = 'ALL'      # Could be 0, 1, 2, or 'ALL'
+```
+
+![Lego_HOG](output_images/vehicle_track/Lego_HOG.png)
+
+It seem that if we use RGB colorspace, the HOG of R, G, B component may be reduntant to each other. However, in YCrCb, there are more different features to learn.
+
+## Train cars/notcars data with LinearSVM
+
+For training a classifier, I apply SVM operation with LinearSVC which is perferable for reducing the time of training. It is notable that it would be better to first normalization data with StandardScaler() provided in scikit learn library.
+
+```python
+# X = np.vstack((car_features, notcar_features)).astype(np.float64)                        
+X = np.concatenate((car_features, notcar_features)).astype(np.float64)
+
+# Fit a per-column scaler
+X_scaler = StandardScaler().fit(X)
+# Apply the scaler to X
+scaled_X = X_scaler.transform(X)
+
+# Define the labels vector
+y = np.concatenate((np.ones(len(car_features)), np.zeros(len(notcar_features))))
+```
+
+
+
+## Apply Sliding Window Search
+
+In order to find the car from the whole image recorded by camera, we should define the window to slide over it with given window size, step size and overlap rate. I split out the region of interest (y_range from **image.shape[0]//2** to **image.shape[0]**). To calculate HOG just once, I first calculate the HOG of each channel from whole image. Then I define some parameters as following:
+
+```python
+window = 64  # window size 64x64
+
+# number of blocks per window
+# given pix_per_cell=8, cell_per_block=2, we get nblocks_per_window = 7.
+nblocks_per_window = (window // pix_per_cell) - cell_per_block + 1
+
+# Instead of overlap, we define how may cells to step.
+cells_per_step = 2 
+
+# calculate how many blocks in the image along x axis and y axis.
+nxblocks = (image.shape[1] // pix_per_cell) - cell_per_block + 1
+nyblocks = (image.shape[0] // pix_per_cell) - cell_per_block + 1
+
+# calculate the total steps (numbers of windows) along x axis and y axis. 
+nxsteps = (nxblocks - nblocks_per_window) // cells_per_step + 1
+nysteps = (nyblocks - nblocks_per_window) // cells_per_step + 1
+```
+
+With nxsteps and nxsteps, we could sub-sampling the HOG value, spatial bining and color histogram as features from each window.
+
+However, it appears that there would be false position drawn with black rectangle, or multi-rectangle draw onto one object.
+
+![fault1](output_images/vehicle_track/fault.png)
+
+With the heap map as the threshing function, we could filter out the range with just one rectangle (may be the false position).
+
+With the label function provided from scipy library, we could label out nearly one rectange per object.
+
+![correct1](output_images/vehicle_track/correct1.png)
+
+![correct2](output_images/vehicle_track/correct2.png)
+
 ## Pipeline (video)
 
-![](test_videos_output/project_video.gif)
-
-
+![test](test_videos_output/project_demo.gif)
 
 ### Discussion
 
-#### 1. Briefly discuss any problems / issues you faced in your implementation of this project.  Where will your pipeline likely fail?  What could you do to make it more robust?
+#### Briefly discuss any problems / issues you faced in your implementation of this project.  Where will your pipeline likely fail?  What could you do to make it more robust? 
+
+
+
+#### Lane Tracking
 
 As we mention before, I think the biggest problem of this repo is its ability to apply in reality data records by ourself without chaning too much.
 
@@ -335,6 +467,14 @@ It's really difficult to pick the good range of threshing to apply in any situda
 Thx to [navoshta's repo](https://github.com/navoshta/detecting-road-features), it really gives me the way to tackle this problem. Instead of trying to pick exactly to edge to the lane from the given image, what we should do is to get the src vertices that will cover most of the lane in image in reality world.
 
 
+
+#### Vehicle Detecting
+
+We coud notice that sometimes the car may not be properly included in rectangle. e.g.
+
+![improper](output_images/vehicle_track/improper.png)
+
+I think it could be improved if I found the better way to realize multi-scale window search with small rectangle closing to half of y-axis of image and large rectangle closing to the bottom of image.
 
 # Important Note.
 

@@ -44,13 +44,16 @@ def bin_spatial(img, color_space='RGB', size=(32, 32)):
         elif color_space == 'YCrCb':
             feature_image = cv2.cvtColor(img, cv2.COLOR_RGB2YCrCb)
     else: feature_image = np.copy(img)            
-    features = cv2.resize(feature_image, size).ravel() # Remove this line!
+    feature_image = cv2.resize(feature_image, size)#.ravel() # Remove this line!
     # Return the feature vector
-    return features
+    return feature_image
     
-feature_vec = bin_spatial(image, color_space='RGB', size=(32, 32))
-
+output_img = bin_spatial(image, color_space='RGB', size=(64, 64))
+feature_vec = output_img.ravel()
+plt.imshow(output_img)
 # Plot features
-plt.plot(feature_vec)
-plt.title('Spatially Binned Features')
+#plt.plot(feature_vec)
+#plt.title('Spatially Binned Features')
+
+
 plt.show()
